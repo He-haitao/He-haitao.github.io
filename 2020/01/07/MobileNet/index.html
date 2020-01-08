@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://yoursite.com').hostname,
+    root: '/',
+    scheme: 'Gemini',
+    version: '7.7.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta property="og:type" content="article">
+<meta property="og:title" content="MobileNet 系列阐述和Gluon实现">
+<meta property="og:url" content="http://yoursite.com/2020/01/07/MobileNet/index.html">
+<meta property="og:site_name" content="Hexo">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://yoursite.com/GalileoMoons_ZH-CN0498325568_1920x1080.jpg">
+<meta property="og:image" content="http://yoursite.com/depthwiseconv_visualization.png">
+<meta property="og:image" content="http://yoursite.com/1.png">
+<meta property="og:image" content="http://yoursite.com/2.png">
+<meta property="og:image" content="http://yoursite.com/3.png">
+<meta property="og:image" content="http://yoursite.com/DepthWiseConv.png">
+<meta property="article:published_time" content="2020-01-07T01:45:11.000Z">
+<meta property="article:modified_time" content="2020-01-07T12:46:34.449Z">
+<meta property="article:author" content="John Doe">
+<meta property="article:tag" content="CNN">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://yoursite.com/GalileoMoons_ZH-CN0498325568_1920x1080.jpg">
+
+<link rel="canonical" href="http://yoursite.com/2020/01/07/MobileNet/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>MobileNet 系列阐述和Gluon实现 | Hexo</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Hexo</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-fw fa-th"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>Archives</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="en">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2020/01/07/MobileNet/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Hexo">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          MobileNet 系列阐述和Gluon实现
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+              
+
+              <time title="Created: 2020-01-07 09:45:11 / Modified: 20:46:34" itemprop="dateCreated datePublished" datetime="2020-01-07T09:45:11+08:00">2020-01-07</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/DeepLearning/" itemprop="url" rel="index">
+                    <span itemprop="name">DeepLearning</span>
+                  </a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p><img src="/GalileoMoons_ZH-CN0498325568_1920x1080.jpg" alt="GalileoMoons"></p>
+<a id="more"></a> 
+
+<!-- toc -->
+
+<h3 id="简介"><a href="#简介" class="headerlink" title="简介"></a>简介</h3><p>深度学习在图像分类，目标检测和图像分割等任务表现出了巨大的优越性。</p>
+<p>但是伴随着模型精度的提升是计算量，存储空间以及能耗方面的巨大开销，对于移动或车载应用都是难以接受的。</p>
+<p>之前的一些模型小型化工作是将焦点放在模型的尺寸上。</p>
+<p>因此，在小型化方面常用的手段有：</p>
+<p>（1）卷积核分解，使用1×N和N×1的卷积核代替N×N的卷积核</p>
+<p>（2）使用bottleneck结构，以SqueezeNet为代表</p>
+<p>（3）以低精度浮点数保存，例如Deep Compression</p>
+<p>（4）冗余卷积核剪枝及哈弗曼编码</p>
+<p>MobileNet进一步深入的研究了depthwise separable convolutions使用方法后设计出MobileNet，depthwiseseparable convolutions的本质是冗余信息更少的稀疏化表达。在此基础上给出了高效模型设计的两个选择：宽度因子（width multiplier）和分辨率因子（resolutionmultiplier）；通过权衡大小、延迟时间以及精度，来构建规模更小、速度更快的MobileNet。Google团队也通过了多样性的实验证明了MobileNet作为高效基础网络的有效性。</p>
+<h2 id="一、深度可分离卷积"><a href="#一、深度可分离卷积" class="headerlink" title="一、深度可分离卷积"></a>一、深度可分离卷积</h2><p>标准的卷积过程可以看上图，一个2×2的卷积核在卷积时，<strong>对应图像区域中的所有通道均被同时考虑</strong>，问题在于，为什么一定要同时考虑图像区域和通道？我们为什么不能把通道和空间区域分开考虑？</p>
+<p>深度可分离卷积提出了一种新的思路：对于不同的输入channel采取不同的卷积核进行卷积，它将普通的卷积操作分解为两个过程。</p>
+<p><img src="/depthwiseconv_visualization.png" alt></p>
+<h4 id="卷积过程"><a href="#卷积过程" class="headerlink" title="卷积过程"></a>卷积过程</h4><p>假设有 <code>N x H x W x C</code>  的输入，同时有 <code>k</code>个 <code>3x3</code> 的卷积。如果设置<code>pad=1</code> 且<code>stride=1</code>，那么普通卷积输出为 <code>N x H x W x k</code> 。</p>
+<p><img src="/1.png" alt></p>
+<h4 id="Depthwise-过程"><a href="#Depthwise-过程" class="headerlink" title="Depthwise 过程"></a>Depthwise 过程</h4><p>Depthwise是指将 <code>N x H x W x C</code> 的输入分为 <code>group=C</code> 组，然后每一组做<code>3x3</code> 卷积。这样相当于收集了每个Channel的空间特征，即Depthwise特征。</p>
+<p><img src="/2.png" alt></p>
+<h4 id="Pointwise-过程"><a href="#Pointwise-过程" class="headerlink" title="Pointwise 过程"></a>Pointwise 过程</h4><p>Pointwise是指对 <code>N x H x W x C</code>  的输入做 <code>k</code>个 <code>1x1</code> 卷积。这样相当于收集了每个点的特征，即Pointwise特征。Depthwise+Pointwise最终输出也是 <code>N x H x W x k</code>。</p>
+<p><img src="/3.png" alt></p>
+<h4 id="深度可分离卷积结构"><a href="#深度可分离卷积结构" class="headerlink" title="深度可分离卷积结构"></a>深度可分离卷积结构</h4><p><img src="/DepthWiseConv.png" alt></p>
+<h2 id="二、优势与创新"><a href="#二、优势与创新" class="headerlink" title="二、优势与创新"></a>二、优势与创新</h2><p>Depthwise+Pointwise可以近似看作一个卷积层：</p>
+<ul>
+<li><strong>普通卷积：</strong>3x3 Conv+BN+ReLU</li>
+<li><strong>Mobilenet卷积：</strong>3x3 Depthwise Conv+BN+ReLU 和 1x1 Pointwise Conv+BN+ReLU</li>
+</ul>
+<h4 id="计算加速"><a href="#计算加速" class="headerlink" title="计算加速"></a>计算加速</h4><h4 id="参数量降低"><a href="#参数量降低" class="headerlink" title="参数量降低"></a>参数量降低</h4><p>假设输入通道数为3，要求输出通道数为256，两种做法：</p>
+<p>1.直接接一个3×3×256的卷积核，参数量为：3×3×3×256 = 6,912</p>
+<p>2.DW操作，分两步完成，参数量为：3×3×3 + 3×1×1×256 = 795（3个特征层<em>（3</em>3的卷积核）），卷积深度参数通常取为1</p>
+<h4 id="乘法运算次数降低"><a href="#乘法运算次数降低" class="headerlink" title="乘法运算次数降低"></a>乘法运算次数降低</h4><p>对比一下不同卷积的乘法次数：</p>
+<ul>
+<li>普通卷积计算量为：  <code>HxWxCxkx3x3</code>  </li>
+<li>Depthwise计算量为：  <code>HxWxCx3x3</code>  </li>
+<li>Pointwise计算量为：   <code>HxWxCxk</code>  </li>
+</ul>
+<p>通过Depthwise+Pointwise的拆分，相当于将普通卷积的计算量压缩为：<br>$$<br>\frac{\text {depthwise }+\text { pointwise }}{\operatorname{conv}}=\frac{H \times W \times C \times 3 \times 3+H \times W \times C \times k}{H \times W \times C \times k \times 3 \times 3}=\frac{1}{k}+\frac{1}{3 \times 3}<br>$$</p>
+<h4 id="通道区域分离"><a href="#通道区域分离" class="headerlink" title="通道区域分离"></a>通道区域分离</h4><p>深度可分离卷积将以往普通卷积操作同时考虑通道和区域改变（卷积先只考虑区域，然后再考虑通道），实现了通道和区域的分离。</p>
+<h2 id="三、MobileNetV1-Gluon实现"><a href="#三、MobileNetV1-Gluon实现" class="headerlink" title="三、MobileNetV1 Gluon实现"></a>三、MobileNetV1 Gluon实现</h2><p>可以自行输入查看打印的pdf的代码参数。</p>
+<p>![](/MobileNet architecture.png)</p>
+<p>下面的Gluon的实现参考的<a href="https://github.com/deepinsight/insightface/blob/master/recognition/symbol/fmobilenet.py" target="_blank" rel="noopener">Insightface_fmobilenet.py</a> 。具体自行查看，注意<code>num_filter</code>和<code>num_group</code>之间的关系。例如，<code>conv2_dw</code>的 <code>num_group</code> 等于 <code>conv1</code> 的<code>num_filter</code>, <code>conv2_dw</code>的 <code>num_filter</code> 是 <code>conv2_dw</code> 的<code>num_group</code> 的整数倍，依次类推。 注意分组卷积输出的是一个tuple类型，长度为1，所以可以看到下面<code>Depthwise_Separable_conv</code> 函数中第二个1x1的卷积的输入写的是<code>conv_dw[0]</code> 。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># coding: gbk</span></span><br><span class="line"><span class="keyword">import</span> sys</span><br><span class="line"><span class="keyword">import</span> os</span><br><span class="line"><span class="keyword">import</span> mxnet <span class="keyword">as</span> mx</span><br><span class="line"><span class="keyword">import</span> symbol_utils</span><br><span class="line"></span><br><span class="line">sys.path.append(os.path.join(os.path.dirname(__file__), <span class="string">'..'</span>))</span><br><span class="line"><span class="keyword">from</span> config <span class="keyword">import</span> config</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">Act</span><span class="params">(data, act_type, name)</span>:</span></span><br><span class="line">    <span class="comment"># ignore param act_type, set it in this function</span></span><br><span class="line">    <span class="keyword">if</span> act_type == <span class="string">'prelu'</span>:</span><br><span class="line">        body = mx.sym.LeakyReLU(data=data, act_type=<span class="string">'prelu'</span>, name=name)</span><br><span class="line">    <span class="keyword">else</span>:</span><br><span class="line">        body = mx.sym.Activation(data=data, act_type=act_type, name=name)</span><br><span class="line">    <span class="keyword">return</span> body</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">Conv</span><span class="params">(data, num_filter=<span class="number">1</span>, kernel=<span class="params">(<span class="number">1</span>, <span class="number">1</span>)</span>, stride=<span class="params">(<span class="number">1</span>, <span class="number">1</span>)</span>, pad=<span class="params">(<span class="number">0</span>, <span class="number">0</span>)</span>, num_group=<span class="number">1</span>, name=None, suffix=<span class="string">''</span>)</span>:</span></span><br><span class="line">    conv = mx.sym.Convolution(data=data, num_filter=num_filter, kernel=kernel, num_group=num_group, stride=stride,</span><br><span class="line">                              pad=pad, no_bias=<span class="literal">True</span>, name=<span class="string">'%s%s_conv2d'</span> % (name, suffix))</span><br><span class="line">    bn = mx.sym.BatchNorm(data=conv, name=<span class="string">'%s%s_batchnorm'</span> % (name, suffix), fix_gamma=<span class="literal">True</span>)</span><br><span class="line">    act = Act(data=bn, act_type=config.net_act, name=<span class="string">'%s%s_relu'</span> % (name, suffix))</span><br><span class="line">    <span class="keyword">return</span> act</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">Depthwise_Separable_conv</span><span class="params">(bf, data, stage_index, n, s, k=<span class="number">1</span>)</span>:</span></span><br><span class="line">    <span class="comment"># out = nn.HybridSequential() 不用传导输入数据了，一层一层加入即可，但是这个conv就是需要传导的啊</span></span><br><span class="line">    stride = (s, s)</span><br><span class="line">    <span class="comment"># print(type(data), dir(data))</span></span><br><span class="line">    <span class="comment"># print(dir(data.attr))</span></span><br><span class="line"></span><br><span class="line">    conv_dw = Conv(data=data, num_group=bf * k, num_filter=bf * k, kernel=(<span class="number">3</span>, <span class="number">3</span>), pad=(<span class="number">1</span>, <span class="number">1</span>), stride=stride,</span><br><span class="line">                   name=<span class="string">"conv_%s_dw"</span> % stage_index),  <span class="comment"># 112/112</span></span><br><span class="line">    <span class="comment"># print(type(conv_dw), conv_dw, len(conv_dw))  # 这里出来的为啥是一个tuple类型的啊，在下面的都不是</span></span><br><span class="line">    conv = Conv(data=conv_dw[<span class="number">0</span>], num_filter=bf * n, kernel=(<span class="number">1</span>, <span class="number">1</span>), pad=(<span class="number">0</span>, <span class="number">0</span>), stride=(<span class="number">1</span>, <span class="number">1</span>),</span><br><span class="line">                name=<span class="string">"conv_%s"</span> % stage_index)</span><br><span class="line">    <span class="comment"># 112/112</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> conv</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="comment"># k,n,stride of conv_dw(type: int)</span></span><br><span class="line">specification = [</span><br><span class="line">    (<span class="number">1</span>, <span class="number">2</span>, <span class="number">1</span>),</span><br><span class="line">    (<span class="number">2</span>, <span class="number">4</span>, <span class="number">2</span>),</span><br><span class="line">    (<span class="number">4</span>, <span class="number">4</span>, <span class="number">1</span>),</span><br><span class="line">    (<span class="number">4</span>, <span class="number">8</span>, <span class="number">2</span>),</span><br><span class="line">    (<span class="number">8</span>, <span class="number">8</span>, <span class="number">1</span>),</span><br><span class="line">    (<span class="number">8</span>, <span class="number">16</span>, <span class="number">2</span>),</span><br><span class="line">    (<span class="number">16</span>, <span class="number">16</span>, <span class="number">1</span>),</span><br><span class="line">    (<span class="number">16</span>, <span class="number">16</span>, <span class="number">1</span>),</span><br><span class="line">    (<span class="number">16</span>, <span class="number">16</span>, <span class="number">1</span>),</span><br><span class="line">    (<span class="number">16</span>, <span class="number">16</span>, <span class="number">1</span>),</span><br><span class="line">    (<span class="number">16</span>, <span class="number">16</span>, <span class="number">1</span>),</span><br><span class="line">    (<span class="number">16</span>, <span class="number">32</span>, <span class="number">2</span>),</span><br><span class="line">    (<span class="number">32</span>, <span class="number">32</span>, <span class="number">1</span>),</span><br><span class="line">]</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">get_symbol_me</span><span class="params">()</span>:</span></span><br><span class="line">    num_classes = config.emb_size</span><br><span class="line">    bn_mom = config.bn_mom</span><br><span class="line">    workspace = config.workspace</span><br><span class="line">    data = mx.symbol.Variable(name=<span class="string">"data"</span>)  <span class="comment"># 224</span></span><br><span class="line">    data = data - <span class="number">127.5</span></span><br><span class="line">    data = data * <span class="number">0.0078125</span></span><br><span class="line">    fc_type = config.net_output</span><br><span class="line">    bf = int(<span class="number">32</span> * config.net_multiplier)  <span class="comment"># 1.0 也就是32</span></span><br><span class="line"></span><br><span class="line">    stride = (<span class="number">2</span>, <span class="number">2</span>) <span class="keyword">if</span> config.net_input == <span class="number">0</span> <span class="keyword">else</span> (<span class="number">1</span>, <span class="number">1</span>)</span><br><span class="line">    out = Conv(data, num_filter=bf, kernel=(<span class="number">3</span>, <span class="number">3</span>), pad=(<span class="number">1</span>, <span class="number">1</span>), stride=stride, name=<span class="string">"conv_1"</span>)  <span class="comment"># 224/112</span></span><br><span class="line">    <span class="keyword">for</span> i, temp <span class="keyword">in</span> enumerate(specification):</span><br><span class="line">        k, n, stride = temp</span><br><span class="line">        out = Depthwise_Separable_conv(bf, out, i + <span class="number">2</span>, n, stride, k)</span><br><span class="line"></span><br><span class="line">    fc1 = symbol_utils.get_fc1(out, num_classes, fc_type)</span><br><span class="line">    <span class="keyword">return</span> fc1</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> __name__ == <span class="string">"__main__"</span>:</span><br><span class="line">    mobilenet = get_symbol_me()</span><br><span class="line">    digraph = mx.viz.plot_network(mobilenet,shape=&#123;<span class="string">'data'</span>:(<span class="number">1</span>,<span class="number">3</span>,<span class="number">112</span>,<span class="number">112</span>)&#125;,title=<span class="string">'mobilenet_me'</span>,node_attrs=&#123;<span class="string">"shape"</span>:<span class="string">"oval"</span>,<span class="string">"fixedsize"</span>:<span class="string">"false"</span>&#125;)</span><br><span class="line">    digraph.view()</span><br><span class="line"></span><br><span class="line">    <span class="comment"># mx.viz.print_summary(mobilenet, shape=&#123;'data': (1, 3, 112, 112)&#125;)</span></span><br><span class="line">    <span class="comment"># get_symbol Total params: 3734848</span></span><br><span class="line">    <span class="comment"># get_symbol_me Total params: 3734848</span></span><br></pre></td></tr></table></figure>
+
+<p>参考链接：</p>
+<p><a href="https://zhuanlan.zhihu.com/p/65377955" target="_blank" rel="noopener">理解分组卷积和深度可分离卷积如何降低参数量</a></p>
+<p><a href="https://blog.csdn.net/T800GHB/article/details/78879612" target="_blank" rel="noopener">深度解读谷歌MobileNet</a></p>
+<p><a href="https://www.cnblogs.com/hellcat/p/9726528.html#_label0" target="_blank" rel="noopener">深度可分离卷积</a></p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/CNN/" rel="tag"># CNN</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/01/05/ResNet/" rel="prev" title="ResNet 解读和Gluon符号式编写">
+      <i class="fa fa-chevron-left"></i> ResNet 解读和Gluon符号式编写
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2020/01/08/hello-world/" rel="next" title="Hello World">
+      Hello World <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#简介"><span class="nav-number">1.</span> <span class="nav-text">简介</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#一、深度可分离卷积"><span class="nav-number"></span> <span class="nav-text">一、深度可分离卷积</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#卷积过程"><span class="nav-number">0.1.</span> <span class="nav-text">卷积过程</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Depthwise-过程"><span class="nav-number">0.2.</span> <span class="nav-text">Depthwise 过程</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Pointwise-过程"><span class="nav-number">0.3.</span> <span class="nav-text">Pointwise 过程</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#深度可分离卷积结构"><span class="nav-number">0.4.</span> <span class="nav-text">深度可分离卷积结构</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#二、优势与创新"><span class="nav-number"></span> <span class="nav-text">二、优势与创新</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#计算加速"><span class="nav-number">0.1.</span> <span class="nav-text">计算加速</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#参数量降低"><span class="nav-number">0.2.</span> <span class="nav-text">参数量降低</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#乘法运算次数降低"><span class="nav-number">0.3.</span> <span class="nav-text">乘法运算次数降低</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#通道区域分离"><span class="nav-number">0.4.</span> <span class="nav-text">通道区域分离</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#三、MobileNetV1-Gluon实现"><span class="nav-number"></span> <span class="nav-text">三、MobileNetV1 Gluon实现</span></a></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">John Doe</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">5</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">1</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">1</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2020</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">John Doe</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> v4.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">Theme – <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> v7.7.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>
